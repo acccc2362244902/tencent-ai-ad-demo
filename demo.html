@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI 互动剧情广告 · Demo</title>
+<style>
+/* ============================================
+   1. Design Tokens — Light / Teal
+   ============================================ */
+:root {
+  --bg-page: #F5F6F8;
+  --bg-card: #FFFFFF;
+  --bg-card-alt: #F0F1F3;
+  --bg-hover: #EBECEF;
+  --bg-elevated: #FFFFFF;
+  --separator: rgba(0,0,0,0.06);
+  --separator-strong: rgba(0,0,0,0.1);
+  --text-primary: rgba(0,0,0,0.88);
+  --text-secondary: rgba(0,0,0,0.5);
+  --text-tertiary: rgba(0,0,0,0.28);
+  --accent: #00BFA5;
+  --accent-rgb: 0,191,165;
+  --accent-subtle: rgba(0,191,165,0.08);
+  --blue: #3B8BFF;
+  --blue-rgb: 59,139,255;
+  --orange: #FF7A00;
+  --red: #FF3B30;
+  --purple: #AF52DE;
+  --purple-rgb: 175,82,222;
+  --gold: #F5C518;
+  --gold-rgb: 245,197,24;
+  --green: #34C759;
+  --teal: #00BFA5;
+  --radius-sm: 8px;
+  --radius-card: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+  --shadow-sm: 0 0 0 0.5px rgba(0,0,0,0.04);
+  --shadow-card: 0 0 0 0.5px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-lg: 0 0 0 0.5px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.06);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --nav-h: 50px;
+  --header-h: 44px;
+  --status-h: 36px;
+  --ease: cubic-bezier(0.4,0,0.2,1);
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:var(--font);background:#000;color:var(--text-primary);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  display:flex;align-items:center;justify-content:center;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+::-webkit-scrollbar{width:0;height:0}
+
+/* ============================================
+   2. App Shell — iPhone 13 Pro Max
+   ============================================ */
+#app{
+  position:relative;width:100%;max-width:430px;height:100vh;max-height:932px;
+  margin:0 auto;background:var(--bg-page);display:flex;flex-direction:column;overflow:hidden;
+  font-size:14px;
+}
+@media(min-width:500px){
+  #app{
+    border-radius:40px;
+    box-shadow:0 0 0 6px #2C2C2E,0 0 0 7.5px #3A3A3C,
+      0 24px 80px rgba(0,0,0,0.55),0 4px 16px rgba(0,0,0,0.3);
+    height:calc(100vh - 40px);
+  }
+}
+.notch-island{
+  position:absolute;top:7px;left:50%;transform:translateX(-50%);
+  width:120px;height:28px;background:#000;border-radius:16px;
+  z-index:999;pointer-events:none;
+}
+.status-bar{
+  position:absolute;top:7px;left:0;right:0;height:28px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;z-index:998;pointer-events:none;
+  font-size:12px;font-weight:600;color:rgba(0,0,0,0.8);
+}
+.status-bar .sb-left{display:flex;align-items:center;gap:4px}
+.status-bar .sb-right{display:flex;align-items:center;gap:5px}
+.status-bar .sb-signal{font-size:14px;line-height:1}
+.status-bar .sb-battery{
+  width:22px;height:10px;border:1.2px solid rgba(0,0,0,0.4);border-radius:2px;
+  padding:1.5px;display:flex;align-items:center;position:relative;
+}
+.status-bar .sb-battery::after{content:'';display:block;width:2px;height:4px;background:rgba(0,0,0,0.4);border-radius:0 1px 1px 0;position:absolute;right:-3px}
+.status-bar .sb-battery-fill{width:100%;height:100%;background:rgba(0,0,0,0.4);border-radius:0.5px}
+
+.pages{flex:1;overflow:hidden;position:relative}
+.page{
+  position:absolute;inset:0;padding-top:36px;overflow-y:auto;
+  opacity:0;visibility:hidden;transition:opacity .3s,visibility .3s,transform .35s var(--ease);
+  transform:translateY(8px);
+}
+.page.active{opacity:1;visibility:visible;transform:translateY(0)}
+.page-scroll{padding-bottom:24px}
+
+/* ============================================
+   3. Bottom Nav
+   ============================================ */
+.bottom-nav{
+  width:100%;height:var(--nav-h);flex-shrink:0;
+  background:rgba(255,255,255,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-top:0.5px solid var(--separator);
+  display:flex;align-items:center;justify-content:space-around;
+  z-index:100;padding-bottom:env(safe-area-inset-bottom,0);
+}
+.nav-item{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;padding:2px 16px;height:100%;transition:color .2s;
+  -webkit-tap-highlight-color:transparent;color:var(--text-tertiary);
+}
+.nav-item .nav-icon{font-size:20px;line-height:1}
+.nav-item .nav-label{font-size:10px;font-weight:500}
+.nav-item.active{color:var(--accent)}
+
+/* ============================================
+   4. Page Header
+   ============================================ */
+.page-header{
+  display:flex;align-items:center;height:var(--header-h);
+  padding:0 12px;position:relative;background:var(--bg-card);
+  border-bottom:0.5px solid var(--separator);
+}
+.page-header .header-title{
+  position:absolute;left:50%;transform:translateX(-50%);
+  font-size:16px;font-weight:600;white-space:nowrap;color:var(--text-primary);
+}
+.page-header .header-left{display:flex;gap:4px;z-index:1}
+.page-header .header-right{margin-left:auto;display:flex;gap:8px;z-index:1}
+.header-btn{
+  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-full);transition:background .15s;
+  font-size:18px;color:var(--text-primary);
+}
+.header-btn:active{background:var(--bg-hover)}
+.header-btn.back{background:var(--bg-card-alt);font-size:20px}
+
+/* ============================================
+   5. Video Player
+   ============================================ */
+.video-wrap{position:relative;width:100%;background:#000}
+.video-player{
+  position:relative;width:100%;aspect-ratio:16/9;
+  background:#0a0a0a;overflow:hidden;
+}
+.video-ctrl-overlay{
+  position:absolute;inset:0;z-index:4;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  padding:8px;background:linear-gradient(transparent 60%,rgba(0,0,0,0.5) 100%);
+  opacity:0;transition:opacity .3s;
+}
+.video-player:hover .video-ctrl-overlay,
+.video-player.ad-active .video-ctrl-overlay{opacity:1}
+.video-ctrl-top{
+  position:absolute;top:42px;left:0;right:0;display:flex;justify-content:space-between;
+  padding:0 10px;z-index:6;
+}
+.video-ctrl-top .ctrl-tag{
+  padding:3px 10px;background:rgba(255,255,255,0.06);backdrop-filter:blur(10px);
+  border:0.5px solid rgba(255,255,255,0.06);border-radius:var(--radius-full);
+  font-size:10px;color:rgba(255,255,255,0.7);font-weight:500;
+}
+.video-ctrl-top .ctrl-tag.active{background:rgba(0,191,165,0.15);color:var(--accent);border-color:rgba(0,191,165,0.2)}
+.video-ctrl-bottom{
+  display:flex;align-items:center;gap:8px;
+}
+.video-ctrl-bottom .ctrl-btn{
+  width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-full);font-size:14px;color:rgba(255,255,255,0.85);transition:background .15s;
+}
+.video-ctrl-bottom .ctrl-btn:active{background:rgba(255,255,255,0.08)}
+.video-ctrl-bottom .ctrl-left{display:flex;align-items:center;gap:4px}
+.video-ctrl-bottom .ctrl-right{display:flex;align-items:center;gap:4px;margin-left:auto}
+.video-ctrl-bottom .ctrl-time{font-size:11px;color:rgba(255,255,255,0.8);gap:2px;margin:0 4px}
+
+/* Progress inside video */
+.vid-progress-wrap{position:absolute;bottom:48px;left:8px;right:8px;height:24px;z-index:5;display:flex;align-items:center}
+.vid-progress{width:100%;height:3px;background:rgba(255,255,255,0.2);border-radius:2px;position:relative}
+.vid-progress-fill{height:100%;width:42%;background:var(--accent);border-radius:2px;position:relative;transition:width .5s}
+.vid-progress-fill::after{content:'';position:absolute;right:-5px;top:-4px;width:11px;height:11px;border-radius:50%;background:var(--accent);box-shadow:0 0 4px rgba(var(--accent-rgb),0.4);opacity:0;transition:opacity .15s}
+.video-player:hover .vid-progress-fill::after,
+.video-player.ad-active .vid-progress-fill::after{opacity:1}
+
+/* Floating AI Ad Entry Button */
+.ad-entry-btn{
+  position:absolute;bottom:56px;right:10px;z-index:6;
+  padding:6px 12px;background:var(--accent);border-radius:var(--radius-full);
+  font-size:10px;font-weight:600;color:#fff;white-space:nowrap;
+  box-shadow:0 2px 10px rgba(var(--accent-rgb),0.35);
+  display:flex;align-items:center;gap:4px;
+  transition:opacity .25s,transform .2s;
+}
+.ad-entry-btn:active{transform:scale(0.93);opacity:.85}
+
+/* ---- Ad Overlay (inside player) ---- */
+.ad-overlay{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  opacity:0;transition:opacity .5s;pointer-events:none;
+  z-index:10;
+}
+.ad-overlay.show{opacity:1;pointer-events:auto}
+.ad-overlay .ad-badge{
+  position:absolute;top:42px;left:10px;z-index:12;
+  padding:2px 8px;background:rgba(255,255,255,0.12);backdrop-filter:blur(8px);
+  border-radius:4px;font-size:9px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:.5px;
+}
+.ad-overlay .ad-countdown{
+  position:absolute;top:42px;right:10px;z-index:12;
+  padding:2px 8px;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);
+  border-radius:4px;font-size:11px;font-weight:600;color:#fff;font-variant-numeric:tabular-nums;
+}
+.ad-overlay .ad-countdown.danger{color:#FF453A;animation:pulse .5s infinite alternate}
+@keyframes pulse{from{opacity:1}to{opacity:.3}}
+.ad-progress{position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(255,255,255,0.1);z-index:12}
+.ad-progress .ad-progress-fill{height:100%;background:var(--accent);transition:width 1s linear;box-shadow:0 0 4px rgba(var(--accent-rgb),0.3)}
+
+/* ---- Ad Scene (dark premium) ---- */
+.ad-scene{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+.ad-scene .scene-glow{position:absolute;inset:-20%;pointer-events:none}
+.ad-scene .scene-deco{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ad-scene .scene-deco .deco-circle{position:absolute;border-radius:50%;border:1px solid rgba(255,255,255,0.04)}
+.ad-scene .scene-deco .deco-line{position:absolute;height:1px;background:rgba(255,255,255,0.03)}
+.ad-scene .scene-deco .deco-dot{
+  position:absolute;border-radius:50%;
+  animation:dotFloat 4s ease-in-out infinite alternate;
+}
+@keyframes dotFloat{from{transform:translate(0,0)}to{transform:translate(6px,-6px)}}
+.ad-scene .scene-deco .deco-particle{
+  position:absolute;width:2px;height:2px;border-radius:50%;
+  animation:particleRise 6s ease-out infinite;
+}
+@keyframes particleRise{
+  0%{transform:translateY(0) scale(0.5);opacity:0}
+  20%{opacity:0.6}
+  100%{transform:translateY(-120px) scale(1.2);opacity:0}
+}
+
+/* Coffee scene */
+.ad-scene.coffee{background:linear-gradient(170deg,#0d0700 0%,#1a0f04 30%,#2a1506 55%,#1a0f04 75%,#0d0700 100%)}
+.ad-scene.coffee .scene-glow{
+  background:radial-gradient(ellipse 60% 50% at 50% 40%,rgba(0,191,165,0.08) 0%,transparent 55%),
+             radial-gradient(ellipse 40% 30% at 30% 60%,rgba(0,191,165,0.04) 0%,transparent 45%);
+  animation:glowDrift 6s ease-in-out infinite alternate;
+}
+@keyframes glowDrift{from{transform:translate(0,0)}to{transform:translate(2%,1%)}}
+.ad-scene.coffee .deco-circle{width:120px;height:120px;top:5%;left:-20px;border-color:rgba(0,191,165,0.06)}
+.ad-scene.coffee .deco-circle:nth-child(2){width:80px;height:80px;bottom:20%;right:-10px;border-color:rgba(0,191,165,0.04)}
+.ad-scene.coffee .deco-line{width:80%;left:10%;top:22%;transform:rotate(-3deg)}
+.ad-scene.coffee .deco-line:nth-child(4){top:78%;transform:rotate(2deg)}
+
+/* Coffee steam decoration */
+.ad-scene.coffee .scene-deco .deco-steam{
+  position:absolute;width:3px;height:18px;
+  background:linear-gradient(to top,rgba(255,255,255,0.08),transparent);
+  border-radius:2px;
+  animation:steamRise 3s ease-out infinite;
+}
+@keyframes steamRise{
+  0%{transform:translateY(0) scaleX(1);opacity:0}
+  15%{opacity:0.5}
+  100%{transform:translateY(-50px) scaleX(2.5);opacity:0}
+}
+.ad-scene.coffee .scene-deco .deco-steam:nth-child(5){left:35%;bottom:30%;animation-delay:0s}
+.ad-scene.coffee .scene-deco .deco-steam:nth-child(6){left:50%;bottom:25%;animation-delay:1.2s;width:2px;height:14px}
+.ad-scene.coffee .scene-deco .deco-steam:nth-child(7){left:65%;bottom:28%;animation-delay:2.4s}
+
+/* Tech scene */
+.ad-scene.tech{background:linear-gradient(170deg,#050d18 0%,#0a1628 30%,#14243d 55%,#0a1628 75%,#050d18 100%)}
+.ad-scene.tech .scene-glow{
+  background:radial-gradient(ellipse 50% 40% at 50% 35%,rgba(59,139,255,0.08) 0%,transparent 55%),
+             radial-gradient(ellipse 30% 20% at 70% 70%,rgba(59,139,255,0.04) 0%,transparent 45%);
+  animation:glowDrift 7s ease-in-out infinite alternate;
+}
+.ad-scene.tech .deco-circle{width:140px;height:140px;top:-20px;right:-30px;border-color:rgba(59,139,255,0.04)}
+.ad-scene.tech .deco-circle:nth-child(2){width:70px;height:70px;bottom:15%;left:-5px;border-color:rgba(59,139,255,0.03)}
+.ad-scene.tech .deco-line{width:60%;left:20%;top:30%;transform:rotate(-2deg);background:rgba(59,139,255,0.03)}
+.ad-scene.tech .deco-line:nth-child(4){width:70%;left:15%;top:70%;transform:rotate(1deg);background:rgba(59,139,255,0.03)}
+/* Tech circuit dots */
+.ad-scene.tech .scene-deco .deco-dot{width:4px;height:4px;background:rgba(59,139,255,0.08)}
+.ad-scene.tech .scene-deco .deco-dot:nth-child(5){top:25%;left:20%;animation-delay:0s}
+.ad-scene.tech .scene-deco .deco-dot:nth-child(6){top:55%;right:25%;animation-delay:1s;width:3px;height:3px}
+.ad-scene.tech .scene-deco .deco-dot:nth-child(7){top:75%;left:60%;animation-delay:2s}
+.ad-scene.tech .scene-deco .deco-dot:nth-child(8){top:15%;right:35%;animation-delay:.5s;width:5px;height:5px}
+/* Tech particles */
+.ad-scene.tech .scene-deco .deco-particle{background:rgba(59,139,255,0.1)}
+.ad-scene.tech .scene-deco .deco-particle:nth-child(9){left:30%;bottom:10%;animation-delay:0s}
+.ad-scene.tech .scene-deco .deco-particle:nth-child(10){left:70%;bottom:5%;animation-delay:1.5s}
+.ad-scene.tech .scene-deco .deco-particle:nth-child(11){left:50%;bottom:15%;animation-delay:3s}
+
+/* 国风 / Cultural scene */
+.ad-scene.guofeng{background:linear-gradient(170deg,#0d0800 0%,#1a1204 30%,#2a1c08 55%,#1a1204 75%,#0d0800 100%)}
+.ad-scene.guofeng .scene-glow{
+  background:radial-gradient(ellipse 55% 45% at 50% 40%,rgba(245,197,24,0.06) 0%,transparent 50%),
+             radial-gradient(ellipse 30% 20% at 25% 70%,rgba(230,150,60,0.03) 0%,transparent 40%);
+  animation:glowDrift 8s ease-in-out infinite alternate;
+}
+.ad-scene.guofeng .deco-circle{width:150px;height:150px;top:-40px;left:60%;border-color:rgba(245,197,24,0.04)}
+.ad-scene.guofeng .deco-circle:nth-child(2){width:90px;height:90px;bottom:10%;left:-10px;border-color:rgba(230,150,60,0.03)}
+.ad-scene.guofeng .deco-line{width:55%;left:22%;top:28%;transform:rotate(-4deg);background:rgba(245,197,24,0.02)}
+.ad-scene.guofeng .deco-line:nth-child(4){width:65%;left:18%;top:72%;transform:rotate(3deg);background:rgba(245,197,24,0.02)}
+/* Mountain silhouette */
+.ad-scene.guofeng .scene-deco .deco-mountain{
+  position:absolute;bottom:0;left:0;right:0;height:25%;
+  background:linear-gradient(to top,rgba(245,197,24,0.03),transparent);
+  clip-path:polygon(0% 100%,10% 45%,22% 60%,35% 30%,50% 55%,65% 25%,78% 50%,90% 35%,100% 60%,100% 100%);
+  opacity:0.6;
+}
+/* Floating petals */
+.ad-scene.guofeng .scene-deco .deco-dot{
+  width:3px;height:3px;background:rgba(245,197,24,0.06);border-radius:50%;
+}
+.ad-scene.guofeng .scene-deco .deco-dot:nth-child(6){top:30%;left:15%;animation-delay:0s;width:4px;height:4px}
+.ad-scene.guofeng .scene-deco .deco-dot:nth-child(7){top:60%;right:20%;animation-delay:1.5s}
+.ad-scene.guofeng .scene-deco .deco-dot:nth-child(8){top:20%;right:40%;animation-delay:3s}
+.ad-scene.guofeng .scene-deco .deco-dot:nth-child(9){top:70%;left:50%;animation-delay:2s;width:2px;height:2px}
+
+/* Scene content */
+.ad-scene-content{position:relative;z-index:2;text-align:center;padding:0 24px}
+.ad-scene-content .scene-icon{
+  width:48px;height:48px;margin:0 auto 8px;
+  background:rgba(255,255,255,0.04);border-radius:var(--radius-xl);
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;border:0.5px solid rgba(255,255,255,0.06);
+  backdrop-filter:blur(8px);
+}
+.ad-scene-content .scene-brand{font-size:17px;font-weight:700;color:#fff;letter-spacing:.5px;text-shadow:0 2px 12px rgba(0,0,0,0.4)}
+.ad-scene-content .scene-line{font-size:10px;color:rgba(255,255,255,0.4);margin-top:3px;letter-spacing:.5px}
+.ad-scene-content .scene-quote{
+  margin-top:12px;font-size:11px;line-height:1.6;
+  color:rgba(255,255,255,0.65);font-style:italic;
+  max-width:270px;margin-left:auto;margin-right:auto;
+  text-shadow:0 1px 8px rgba(0,0,0,0.4);
+  padding:8px 14px;background:rgba(0,0,0,0.2);border-radius:var(--radius-card);
+  border:0.5px solid rgba(255,255,255,0.04);backdrop-filter:blur(4px);
+}
+.ad-scene-content .scene-quote .brand-highlight{color:var(--teal);font-weight:600}
+.ad-scene-content .scene-quote .brand-highlight-tech{color:#5BA8FF;font-weight:600}
+.ad-scene-content .scene-quote .brand-highlight-cultural{color:#F5C518;font-weight:600}
+
+/* ---- Choices Overlay ---- */
+.choices-overlay{
+  position:absolute;bottom:0;left:0;right:0;
+  z-index:11;
+  padding:24px 10px 8px;
+  background:linear-gradient(transparent 0%,rgba(0,0,0,0.45) 40%,rgba(0,0,0,0.7) 100%);
+  display:none;
+}
+.choices-overlay.show{display:block;animation:fadeUp .35s var(--ease)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.choices-overlay .ch-header{
+  display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:0 4px;
+}
+.choices-overlay .ch-header .ch-ai{
+  padding:2px 7px;background:rgba(175,82,222,0.25);border-radius:4px;
+  font-size:8px;font-weight:700;color:#CDA0FF;letter-spacing:.3px;
+}
+.choices-overlay .ch-header .ch-label{font-size:11px;font-weight:600;color:rgba(255,255,255,0.85)}
+.choices-overlay .ch-header .ch-hint{margin-left:auto;font-size:10px;color:rgba(255,255,255,0.4)}
+.choices-overlay .ch-header .ch-hint strong{color:var(--accent);font-weight:700}
+.choices-overlay .ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choices-overlay .ch-grid .ch-btn{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:12px 10px;
+  background:rgba(255,255,255,0.06);backdrop-filter:blur(16px);
+  border:0.5px solid rgba(255,255,255,0.08);
+  border-radius:var(--radius-lg);
+  transition:all .2s;-webkit-tap-highlight-color:transparent;
+}
+.choices-overlay .ch-grid .ch-btn:active{transform:scale(0.96);background:rgba(255,255,255,0.1)}
+.choices-overlay .ch-grid .ch-btn .ch-icon{font-size:20px;line-height:1}
+.choices-overlay .ch-grid .ch-btn .ch-text{font-size:11px;font-weight:600;color:#fff}
+.choices-overlay .ch-grid .ch-btn .ch-sub{font-size:9px;color:rgba(255,255,255,0.45);text-align:center;line-height:1.3}
+.choices-overlay .ch-grid .ch-btn .ch-brand{
+  padding:1px 6px;background:rgba(var(--accent-rgb),0.12);border-radius:4px;
+  font-size:8px;color:var(--accent);font-weight:600;
+}
+.choices-overlay .ch-grid .ch-btn.chosen{
+  background:rgba(var(--accent-rgb),0.1);border-color:rgba(var(--accent-rgb),0.25);
+}
+.choices-overlay .ch-grid .ch-btn.chosen::after{
+  content:'✓';position:absolute;top:5px;right:6px;
+  font-size:10px;color:var(--accent);font-weight:800;
+}
+
+/* ---- Result Overlay ---- */
+.result-overlay{
+  position:absolute;bottom:0;left:0;right:0;
+  z-index:12;
+  padding:20px 14px 14px;
+  background:linear-gradient(transparent 0%,rgba(0,0,0,0.55) 30%,rgba(0,0,0,0.8) 100%);
+  display:none;
+}
+.result-overlay.show{display:block;animation:fadeUp .35s var(--ease)}
+.result-overlay .r-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.result-overlay .r-top .r-badge{
+  padding:3px 10px;background:rgba(0,0,0,0.3);border-radius:var(--radius-full);
+  border:0.5px solid rgba(255,255,255,0.1);
+  font-size:11px;font-weight:700;color:#fff;
+}
+.result-overlay .r-ai{
+  font-size:12px;line-height:1.6;color:rgba(255,255,255,0.75);
+  margin-bottom:8px;padding:10px 14px;
+  background:rgba(0,0,0,0.3);border-radius:var(--radius-card);
+  border:0.5px solid rgba(255,255,255,0.05);
+}
+.result-overlay .r-ai .hl{color:var(--accent);font-weight:600}
+.result-overlay .r-ai .hl-tech{color:#5BA8FF;font-weight:600}
+.result-overlay .r-ai .hl-cultural{color:#F5C518;font-weight:600}
+.result-overlay .r-rewards{display:flex;gap:8px;margin-bottom:10px}
+.result-overlay .r-rewards .rr-item{
+  padding:5px 12px;background:rgba(0,0,0,0.3);border-radius:var(--radius-full);
+  display:flex;align-items:center;gap:4px;
+  font-size:11px;color:rgba(255,255,255,0.6);border:0.5px solid rgba(255,255,255,0.05);
+}
+.result-overlay .r-rewards .rr-item .rr-val{color:#fff;font-weight:700}
+
+/* Result action buttons */
+.r-actions{display:flex;gap:6px}
+.r-actions .r-action-btn{
+  flex:1;padding:9px 8px;border-radius:var(--radius-full);
+  font-size:11px;font-weight:500;color:rgba(255,255,255,0.7);
+  background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.08);
+  text-align:center;transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.r-actions .r-action-btn:active{background:rgba(255,255,255,0.12)}
+.r-actions .r-action-btn.primary{
+  background:var(--accent);color:#fff;font-weight:600;
+  border-color:transparent;flex:1.5;
+}
+.r-actions .r-action-btn.primary:active{opacity:.8}
+
+/* ============================================
+   6. Show Info Section
+   ============================================ */
+.show-info{padding:12px 14px;background:var(--bg-card)}
+.show-info .si-title{font-size:17px;font-weight:600;color:var(--text-primary);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.show-info .si-title .si-ep{color:var(--accent)}
+.show-info .si-tags{display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:var(--text-secondary)}
+.show-info .si-tags .si-vip{
+  padding:1px 5px;background:var(--gold);color:#1A1A1A;border-radius:3px;
+  font-size:9px;font-weight:700;letter-spacing:.3px;
+}
+.show-info .si-tags .si-dot{width:2px;height:2px;border-radius:50%;background:var(--text-tertiary)}
+.show-info .si-actions{display:flex;gap:8px;margin-bottom:10px}
+.show-info .si-actions button{
+  display:flex;align-items:center;gap:4px;
+  padding:6px 14px;background:var(--bg-card-alt);border:0.5px solid var(--separator);
+  border-radius:var(--radius-full);
+  font-size:12px;font-weight:500;color:var(--text-secondary);transition:background .15s;
+}
+.show-info .si-actions button:active{background:var(--bg-hover)}
+.show-info .si-desc{
+  font-size:12px;line-height:1.65;color:var(--text-secondary);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;transition:all .3s;
+}
+.show-info .si-desc.expanded{-webkit-line-clamp:unset}
+.show-info .si-desc-toggle{
+  font-size:12px;color:var(--accent);margin-top:4px;display:inline-block;
+  padding:2px 0;
+}
+
+/* Quick Actions */
+.quick-actions{
+  display:flex;justify-content:space-around;align-items:center;
+  padding:12px 6px;margin:0 14px;
+  background:var(--bg-card);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:0.5px solid var(--separator);border-radius:var(--radius-lg);
+}
+.quick-actions .qa-item{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-size:10px;color:var(--text-secondary);transition:color .15s;
+  -webkit-tap-highlight-color:transparent;padding:4px 8px;
+}
+.quick-actions .qa-item:active{color:var(--text-primary)}
+.quick-actions .qa-item .qa-icon{
+  width:32px;height:32px;border-radius:var(--radius-full);
+  background:var(--bg-card-alt);display:flex;align-items:center;justify-content:center;
+  font-size:15px;
+}
+
+/* Episode Selector */
+.ep-section{margin:14px 0}
+.ep-section .ep-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;margin-bottom:10px;
+}
+.ep-section .ep-head .ep-title{font-size:14px;font-weight:600;color:var(--text-primary)}
+.ep-section .ep-head .ep-arrow{font-size:12px;color:var(--text-tertiary)}
+.ep-scroll{display:flex;gap:8px;overflow-x:auto;padding:0 14px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.ep-scroll::-webkit-scrollbar{display:none}
+.ep-card{
+  flex-shrink:0;width:48px;height:48px;border-radius:var(--radius-card);
+  background:var(--bg-card-alt);border:0.5px solid var(--separator);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:500;color:var(--text-secondary);
+  position:relative;transition:all .15s;
+}
+.ep-card.active{background:var(--accent);color:#fff;font-weight:700}
+.ep-card .ep-vip{
+  position:absolute;top:-2px;right:-2px;
+  padding:1px 4px;background:var(--gold);color:#1A1A1A;
+  font-size:7px;font-weight:700;border-radius:3px;line-height:1;
+}
+
+/* Recommendation */
+.rec-section{padding:14px}
+.rec-section .rec-title{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:10px}
+.rec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rec-card{
+  border-radius:var(--radius-card);overflow:hidden;
+  background:var(--bg-card);border:0.5px solid var(--separator);
+  cursor:pointer;transition:all .15s;
+}
+.rec-card:active{transform:scale(0.96);background:var(--bg-hover)}
+.rec-card .rec-poster{
+  aspect-ratio:3/4;background:var(--bg-card-alt);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;position:relative;
+}
+.rec-card .rec-poster .rec-poster-label{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:4px 6px;background:linear-gradient(transparent,rgba(0,0,0,0.6));
+  font-size:9px;color:#fff;text-align:center;font-weight:500;
+}
+.rec-card .rec-info{padding:8px 10px 10px}
+.rec-card .rec-info .rec-name{font-size:12px;font-weight:500;color:var(--text-primary);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec-card .rec-info .rec-rating{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--text-tertiary)}
+.rec-card .rec-info .rec-rating .rec-score{color:var(--accent);font-weight:600}
+
+/* ============================================
+   7. Profile Page
+   ============================================ */
+.profile-account{
+  margin:10px 12px 8px;padding:14px 16px;
+  background:var(--bg-card);border:0.5px solid var(--separator);
+  border-radius:var(--radius-lg);
+  display:flex;align-items:center;gap:12px;
+}
+.profile-account .pa-avatar{
+  width:52px;height:52px;border-radius:var(--radius-full);
+  background:var(--bg-card-alt);border:1px solid var(--separator);
+  display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;
+}
+.profile-account .pa-info{flex:1;min-width:0}
+.profile-account .pa-info .pa-name{font-size:17px;font-weight:700;color:var(--text-primary);letter-spacing:.3px}
+.profile-account .pa-info .pa-level{font-size:11px;color:var(--text-tertiary);margin-top:2px;margin-bottom:8px}
+.profile-account .pa-stats{display:flex;gap:14px}
+.profile-account .pa-stat{display:flex;align-items:center;gap:4px}
+.profile-account .pa-stat .pa-stat-val{font-size:15px;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.profile-account .pa-stat .pa-stat-lbl{font-size:10px;color:var(--text-tertiary)}
+.profile-account .pa-arrow{font-size:18px;color:var(--text-tertiary);opacity:.4}
+
+/* VIP Banner */
+.vip-banner{
+  margin:10px 12px 12px;padding:10px 14px;
+  background:linear-gradient(135deg,rgba(245,197,24,0.06),transparent);
+  border:0.5px solid rgba(245,197,24,0.1);
+  border-radius:var(--radius-card);display:flex;align-items:center;gap:10px;
+}
+.vip-banner .vip-icon{
+  width:28px;height:28px;border-radius:6px;
+  background:var(--gold);display:flex;align-items:center;justify-content:center;
+  font-size:15px;flex-shrink:0;
+}
+.vip-banner .vip-text{font-size:13px;font-weight:600;color:var(--gold);flex:1}
+.vip-banner .vip-arrow{font-size:16px;color:var(--gold);opacity:.6}
+
+.profile-list-card{
+  margin:0 12px 10px;
+  background:var(--bg-card);border:0.5px solid var(--separator);
+  border-radius:var(--radius-lg);overflow:hidden;
+}
+.profile-list-item{
+  display:flex;align-items:center;gap:12px;
+  padding:13px 14px;cursor:pointer;transition:background .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.profile-list-item:active{background:var(--bg-hover)}
+.profile-list-item+.profile-list-item{border-top:0.5px solid var(--separator)}
+.profile-list-item .pli-icon{width:28px;text-align:center;font-size:17px;flex-shrink:0}
+.profile-list-item .pli-text{flex:1;font-size:14px;color:var(--text-primary);font-weight:500}
+.profile-list-item .pli-arrow{font-size:14px;color:var(--text-tertiary)}
+.profile-footer{padding:8px 14px 20px;text-align:center;font-size:12px;color:var(--text-tertiary);line-height:1.6}
+
+/* ============================================
+   8. Coins Page
+   ============================================ */
+.coins-user-card{
+  margin:12px;padding:16px;
+  background:var(--bg-card);border:0.5px solid var(--separator);
+  border-radius:var(--radius-lg);
+}
+.coins-user-card .cuc-top{
+  display:flex;align-items:center;gap:14px;margin-bottom:14px;
+}
+.coins-user-card .cuc-avatar{
+  width:48px;height:48px;border-radius:var(--radius-full);
+  background:var(--accent-subtle);border:2px solid rgba(var(--accent-rgb),0.08);
+  display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;
+}
+.coins-user-card .cuc-info{flex:1}
+.coins-user-card .cuc-info .cuc-name{font-size:16px;font-weight:700;color:var(--text-primary)}
+.coins-user-card .cuc-info .cuc-level{font-size:12px;color:var(--text-tertiary);margin-top:2px}
+.coins-user-card .cuc-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.coins-user-card .cuc-stats .cuc-stat{
+  text-align:center;padding:10px;
+  background:var(--bg-card-alt);border-radius:var(--radius-card);
+  border:0.5px solid var(--separator);
+}
+.coins-user-card .cuc-stats .cuc-stat .cuc-val{font-size:22px;font-weight:800;color:var(--accent)}
+.coins-user-card .cuc-stats .cuc-stat .cuc-lbl{font-size:10px;color:var(--text-tertiary);margin-top:2px}
+.coin-section-title{
+  padding:0 12px;margin-bottom:10px;
+  font-size:13px;font-weight:600;color:var(--text-primary);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.coin-section-title .cst-more{font-size:11px;font-weight:400;color:var(--text-tertiary)}
+
+/* ============================================
+   9. Lovedrama — Fan Voting / Ad Heat
+   ============================================ */
+.ld-hero{margin:12px;padding:16px;background:linear-gradient(135deg,rgba(0,191,165,0.06),rgba(0,191,165,0.01));border:0.5px solid rgba(0,191,165,0.08);border-radius:var(--radius-lg)}
+.ld-hero-top{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.ld-poster{width:56px;height:56px;border-radius:var(--radius-card);background:rgba(var(--accent-rgb),0.04);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;border:0.5px solid rgba(var(--accent-rgb),0.06)}
+.ld-drama-info{flex:1}
+.ld-drama-name{font-size:16px;font-weight:700;color:var(--text-primary)}
+.ld-drama-sub{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+.ld-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.ld-stat{text-align:center;padding:8px 4px;background:var(--bg-card-alt);border-radius:var(--radius-card);border:0.5px solid var(--separator)}
+.ld-stat-val{font-size:15px;font-weight:800;color:var(--accent)}
+.ld-stat-lbl{font-size:9px;color:var(--text-tertiary);margin-top:2px}
+
+.ld-vote-module{margin:0 12px 14px;padding:14px 16px;background:var(--bg-card);border:0.5px solid var(--separator);border-radius:var(--radius-lg)}
+.ld-vm-head{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.ld-vm-icon{font-size:16px}
+.ld-vm-title{font-size:13px;font-weight:600;color:var(--text-primary);flex:1}
+.ld-vm-remain{font-size:11px;color:var(--text-tertiary)}
+.ld-vm-remain strong{color:var(--accent);font-weight:700}
+.ld-vm-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px;background:rgba(0,191,165,0.1);border:0.5px solid rgba(0,191,165,0.15);
+  border-radius:var(--radius-lg);font-size:14px;font-weight:600;color:var(--accent);
+  transition:all .2s;margin-bottom:8px;
+}
+.ld-vm-btn:active{transform:scale(0.97);background:rgba(0,191,165,0.18)}
+.ld-vm-btn .ld-vm-btn-sub{font-size:10px;font-weight:400;color:var(--text-tertiary)}
+.ld-vm-info{font-size:11px;color:var(--text-tertiary);text-align:center;line-height:1.5}
+.ld-vm-info-em{color:var(--accent);font-weight:700}
+
+.ld-rank-section{margin:0 12px}
+.ld-rank-title{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+
+/* ============================================
+   10. Shop
+   ============================================ */
+.balance-card{margin:12px 12px 0}
+.balance-card .b-inner{
+  background:var(--bg-card);border:0.5px solid var(--separator);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow-sm);padding:12px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.balance-card .b-inner .b-label{font-size:12px;color:var(--text-secondary)}
+.balance-card .b-inner .b-val{font-size:18px;font-weight:800;color:var(--accent)}
+.shop-label{padding:12px 12px 8px;font-size:12px;color:var(--text-tertiary);font-weight:500}
+.shop-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:0 12px 12px}
+.shop-item{
+  background:var(--bg-card);border:0.5px solid var(--separator);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow-sm);padding:14px 10px;text-align:center;
+  transition:all .2s;position:relative;cursor:pointer;
+}
+.shop-item:active{transform:scale(0.97);background:var(--bg-hover)}
+.shop-item .si-icon-cell{
+  width:40px;height:40px;border-radius:var(--radius-full);
+  margin:0 auto 8px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.shop-item .si-icon-cell.accent{background:var(--accent-subtle)}
+.shop-item .si-icon-cell.blue{background:rgba(59,139,255,0.1)}
+.shop-item .si-icon-cell.orange{background:rgba(255,122,0,0.1)}
+.shop-item .si-icon-cell.purple{background:rgba(175,82,222,0.1)}
+.shop-item .si-icon-cell.gold{background:rgba(0,191,165,0.1)}
+.shop-item .si-name{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px}
+.shop-item .si-desc{font-size:10px;color:var(--text-tertiary);margin-bottom:10px;line-height:1.4}
+.shop-item .si-price{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:5px 16px;background:var(--accent-subtle);border-radius:var(--radius-full);
+  font-size:13px;font-weight:700;color:var(--accent);
+}
+.shop-item .si-badge{
+  position:absolute;top:8px;right:8px;
+  padding:2px 7px;border-radius:4px;font-size:8px;font-weight:600;line-height:1.4;
+}
+.shop-item .si-badge.free{background:var(--accent-subtle);color:var(--accent)}
+.shop-item .si-badge.lottery{background:rgba(255,122,0,0.1);color:var(--orange)}
+.shop-item .si-badge.qq{background:rgba(59,139,255,0.1);color:var(--blue)}
+
+/* ============================================
+   11. Ranking
+   ============================================ */
+.my-rank{margin:12px;padding:14px 16px;background:var(--bg-card);border:0.5px solid var(--separator);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:space-between}
+.my-rank .mr-info .mr-label{font-size:11px;color:var(--text-tertiary);margin-bottom:2px}
+.my-rank .mr-info .mr-pos{font-size:24px;font-weight:800;color:var(--accent)}
+.my-rank .mr-info .mr-contrib{font-size:12px;color:var(--text-secondary);margin-top:1px}
+.my-rank .mr-badge{width:40px;height:40px;border-radius:var(--radius-full);background:rgba(var(--accent-rgb),0.06);display:flex;align-items:center;justify-content:center;font-size:20px}
+
+.rank-list{margin:0 12px 12px;background:var(--bg-card);border:0.5px solid var(--separator);border-radius:var(--radius-lg);overflow:hidden}
+.rank-item{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:0.5px solid var(--separator);transition:.15s}
+.rank-item:last-child{border-bottom:none}
+.rank-item:active{background:var(--bg-hover)}
+.rank-item .r-num{width:26px;text-align:center;font-size:15px;font-weight:700;color:var(--text-tertiary);flex-shrink:0}
+.rank-item .r-num.gold{color:var(--gold)}
+.rank-item .r-num.silver{color:#B0B0B8}
+.rank-item .r-num.bronze{color:#CD7F32}
+.rank-item .r-info{flex:1}
+.rank-item .r-info .r-name{font-size:13px;font-weight:600;color:var(--text-primary)}
+.rank-item .r-info .r-heat{font-size:10px;color:var(--text-tertiary);margin-top:1px}
+.rank-item .r-contrib{text-align:right}
+.rank-item .r-contrib .rc-val{font-size:13px;font-weight:600;color:var(--accent)}
+.rank-item .r-contrib .rc-lbl{font-size:9px;color:var(--text-tertiary);display:block;margin-top:1px}
+.rank-item.me{background:rgba(var(--accent-rgb),0.04);position:relative}
+.rank-item.me::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2px;background:var(--accent);border-radius:0 2px 2px 0}
+
+/* ============================================
+   12. Fullscreen Ad Page
+   ============================================ */
+#page-fullad{padding-top:0;overflow:hidden}
+.fullad-backdrop{
+  position:absolute;inset:0;background:#000;
+  display:flex;align-items:center;justify-content:center;
+}
+.fullad-stage{width:100%;aspect-ratio:16/9;position:relative;overflow:hidden}
+.fullad-top{
+  position:absolute;top:0;left:0;right:0;height:40px;
+  display:flex;align-items:center;padding:0 12px;z-index:12;
+  background:linear-gradient(rgba(0,0,0,0.5),transparent);
+}
+.fullad-countdown{
+  margin-left:10px;font-size:13px;font-weight:700;color:#fff;
+  font-variant-numeric:tabular-nums;
+}
+.fullad-countdown.danger{color:#FF453A;animation:pulse .5s infinite alternate}
+.fullad-close{
+  margin-left:auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-full);font-size:16px;color:rgba(255,255,255,0.7);
+  background:rgba(255,255,255,0.08);transition:background .15s;
+}
+.fullad-close:active{background:rgba(255,255,255,0.15)}
+.fullad-top .fullad-badge{
+  padding:2px 8px;background:rgba(255,255,255,0.12);backdrop-filter:blur(8px);
+  border-radius:4px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:.5px;
+}
+.fullad-content{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:2;padding:40px 24px 80px;
+}
+.fullad-content .fullad-icon{
+  width:52px;height:52px;margin-bottom:8px;
+  background:rgba(255,255,255,0.04);border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;border:0.5px solid rgba(255,255,255,0.06);
+  backdrop-filter:blur(8px);
+}
+.fullad-content .fullad-brand{font-size:18px;font-weight:700;color:#fff;letter-spacing:.5px;text-shadow:0 2px 12px rgba(0,0,0,0.4)}
+.fullad-content .fullad-line{font-size:11px;color:rgba(255,255,255,0.4);margin-top:3px;letter-spacing:.5px}
+.fullad-content .fullad-quote{
+  margin-top:10px;font-size:11px;line-height:1.5;
+  color:rgba(255,255,255,0.55);font-style:italic;
+  max-width:260px;text-align:center;
+  padding:8px 14px;background:rgba(0,0,0,0.2);border-radius:var(--radius-card);
+  border:0.5px solid rgba(255,255,255,0.04);backdrop-filter:blur(4px);
+}
+.ad-fullscreen-btn{
+  position:absolute;bottom:12px;right:10px;z-index:13;
+  width:36px;height:36px;border-radius:var(--radius-full);
+  background:rgba(0,0,0,0.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:0.5px solid rgba(255,255,255,0.1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;color:#fff;transition:all .2s;
+}
+.ad-fullscreen-btn:active{transform:scale(0.9);background:rgba(0,0,0,0.6)}
+
+/* ============================================
+   13. AI Status Indicator
+   ============================================ */
+.ai-status{
+  position:absolute;bottom:44px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:5px;z-index:3;
+  font-size:9px;color:rgba(255,255,255,0.2);letter-spacing:.3px;
+  transition:opacity .5s;
+}
+.ai-status .ai-dot{
+  width:4px;height:4px;border-radius:50%;background:var(--accent);
+  animation:aiPulse 1.2s ease-in-out infinite;
+}
+@keyframes aiPulse{
+  0%,100%{opacity:.3;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.3)}
+}
+.ai-status .ai-check{color:var(--accent);font-size:10px;display:none}
+.ai-status.done .ai-dot{display:none}
+.ai-status.done .ai-check{display:inline}
+.ai-status.done{color:rgba(255,255,255,0.25)}
+
+/* ============================================
+   14. Confetti & Toast
+   ============================================ */
+.confetti-box{position:fixed;inset:0;pointer-events:none;z-index:201;overflow:hidden}
+.confetti{
+  position:absolute;width:5px;height:5px;top:-10px;
+  border-radius:50%;animation:fall linear forwards;
+}
+@keyframes fall{
+  0%{transform:translateY(0) rotate(0deg);opacity:1}
+  100%{transform:translateY(100vh) rotate(720deg);opacity:0}
+}
+.toast{
+  position:fixed;top:50px;left:50%;transform:translateX(-50%) translateY(-80px);
+  background:rgba(30,32,34,0.9);border:0.5px solid rgba(255,255,255,0.1);
+  border-radius:var(--radius-lg);padding:10px 18px;
+  font-size:13px;font-weight:500;color:#fff;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);z-index:9999;display:flex;align-items:center;gap:7px;
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+  white-space:nowrap;
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ============================================
+   14. Responsive
+   ============================================ */
+@media(max-width:499px){
+  #app{height:100%;border-radius:0;box-shadow:none;margin:0}
+  .notch-island,.status-bar{display:none}
+  .page{padding-top:0}
+  .choices-overlay .ch-grid{gap:6px}
+  .choices-overlay .ch-grid .ch-btn{padding:8px 6px}
+  .choices-overlay .ch-grid .ch-btn .ch-icon{font-size:18px}
+  .shop-grid{gap:8px}
+  .shop-item{padding:12px 8px}
+}
+
+/* ============================================
+   15. AI Match Visualization Page
+   ============================================ */
+.aim-container{padding:16px 16px 80px}
+.aim-step{background:var(--bg-card);border-radius:var(--radius-card);padding:16px;margin-bottom:0;border:0.5px solid var(--separator-strong);transition:.3s}
+.aim-step-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.aim-step-num{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.5px}
+.aim-step-title{font-size:14px;font-weight:600;color:var(--text-primary);flex:1}
+.aim-step-status{font-size:10px;font-weight:500;color:var(--accent);padding:2px 8px;border-radius:20px;background:rgba(var(--accent-rgb),0.08)}
+.aim-step-body{padding:4px 0 0}
+.aim-metric{display:flex;align-items:center;padding:8px 12px;background:var(--bg-card-alt);border-radius:var(--radius-sm);margin-bottom:6px}
+.aim-metric:last-child{margin-bottom:0}
+.aim-metric-label{font-size:12px;color:var(--text-secondary);width:90px;flex-shrink:0}
+.aim-metric-value{font-size:12px;font-weight:500;color:var(--text-primary)}
+.aim-arrow{text-align:center;padding:10px 0;font-size:16px;color:var(--accent);opacity:.5}
+
+.aim-match-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-card-alt);border-radius:var(--radius-sm);margin-bottom:6px;position:relative}
+.aim-match-row:last-child{margin-bottom:0}
+.aim-match-row.top{border:0.5px solid rgba(var(--accent-rgb),0.2);background:rgba(var(--accent-rgb),0.04)}
+.aim-match-icon{font-size:18px;width:28px;text-align:center}
+.aim-match-name{font-size:12px;font-weight:600;color:var(--text-primary);width:60px;flex-shrink:0}
+.aim-match-bar-wrap{flex:1;height:6px;background:var(--bg-card);border-radius:3px;overflow:hidden}
+.aim-match-bar{height:100%;border-radius:3px;background:var(--separator-strong);transition:width 1s ease}
+.aim-match-bar.fill{background:linear-gradient(90deg,var(--accent),rgba(var(--accent-rgb),0.6))}
+.aim-match-score{font-size:11px;font-weight:700;color:var(--text-primary);width:32px;text-align:right}
+.aim-match-tag{font-size:9px;font-weight:600;color:#fff;background:var(--accent);padding:1px 6px;border-radius:20px;margin-left:auto}
+
+.aim-gen-row{display:flex;align-items:center;padding:8px 12px;background:var(--bg-card-alt);border-radius:var(--radius-sm);margin-bottom:6px}
+.aim-gen-row:last-child{margin-bottom:0}
+.aim-gen-label{font-size:12px;color:var(--text-secondary);width:60px;flex-shrink:0}
+.aim-gen-value{font-size:12px;font-weight:500;color:var(--text-primary)}
+
+.aim-ready{text-align:center;padding:24px 16px;margin-top:8px;background:var(--bg-card);border-radius:var(--radius-card);border:0.5px solid var(--separator-strong)}
+.aim-ready-icon{font-size:32px;margin-bottom:8px}
+.aim-ready-text{font-size:12px;color:var(--text-secondary);margin-bottom:16px}
+.aim-ready-btn{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-full);padding:12px 32px;font-size:14px;font-weight:600;cursor:pointer;transition:transform .2s,box-shadow .2s}
+.aim-ready-btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(var(--accent-rgb),0.3)}
+
+/* AI float button on video player */
+.ai-float-btn{position:absolute;top:6px;right:6px;z-index:8;width:30px;height:30px;border-radius:50%;border:none;background:rgba(0,0,0,0.35);color:#fff;font-size:13px;cursor:pointer;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);transition:transform .2s,background .2s;display:flex;align-items:center;justify-content:center;line-height:1}
+.ai-float-btn:hover{transform:scale(1.1);background:rgba(0,0,0,0.55)}
+.ai-float-btn .tip{position:absolute;top:100%;right:0;margin-top:4px;font-size:8px;color:rgba(255,255,255,0.3);white-space:nowrap;pointer-events:none}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Notch & Status Bar -->
+  <div class="notch-island"></div>
+  <div class="status-bar">
+    <div class="sb-left"><span class="sb-signal">●●●●</span><span>中国移动</span></div>
+    <div class="sb-right"><span id="statusTime">9:41</span><span class="sb-battery"><span class="sb-battery-fill"></span></span></div>
+  </div>
+
+  <!-- ===== PAGES ===== -->
+  <div class="pages">
+
+    <!-- ===== VIDEO PAGE ===== -->
+    <div class="page active" id="page-video">
+      <div class="page-header">
+        <div class="header-left"><button class="header-btn">‹</button></div>
+        <div class="header-title">都市职场 · S03E08</div>
+        <div class="header-right">
+          <button class="header-btn">🔍</button>
+          <button class="header-btn">⋯</button>
+        </div>
+      </div>
+
+      <div class="video-wrap">
+        <div class="video-player" id="videoPlayer">
+          <!-- Normal playing state -->
+          <div class="scene" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0a0a0a">
+            <span style="color:rgba(255,255,255,0.02);font-size:10px;font-weight:600;letter-spacing:1.5px;pointer-events:none">腾讯视频</span>
+          </div>
+
+          <!-- Video Controls -->
+          <div class="video-ctrl-overlay">
+            <div class="video-ctrl-top">
+              <span class="ctrl-tag">倍速</span>
+              <span class="ctrl-tag active">1080P</span>
+            </div>
+            <div class="vid-progress-wrap"><div class="vid-progress"><div class="vid-progress-fill" id="mainProgress"></div></div></div>
+            <div class="video-ctrl-bottom">
+              <div class="ctrl-left">
+                <button class="ctrl-btn" id="playBtn">⏸</button>
+                <span class="ctrl-time" id="timeDisplay">24:18 / 42:00</span>
+              </div>
+              <div class="ctrl-right">
+                <button class="ctrl-btn">🔊</button>
+                <button class="ctrl-btn">⛶</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Match Visualization Button -->
+          <button class="ai-float-btn" onclick="go('aimatch')" title="查看 AI 匹配过程">🤖<span class="tip">AI 匹配</span></button>
+
+          <!-- Floating AI Ad Entry Button -->
+          <button class="ad-entry-btn" id="adEntryBtn" onclick="startAd()">✨ AI 互动广告</button>
+
+          <!-- Ad Overlay -->
+          <div class="ad-overlay" id="adOverlay">
+            <div class="ad-badge">AI 广告</div>
+            <div class="ad-countdown" id="adCountdown">18s</div>
+            <div class="ad-progress"><div class="ad-progress-fill" id="adProgressFill"></div></div>
+
+            <!-- Ad Scene -->
+            <div class="ad-scene coffee" id="adScene">
+              <div class="scene-glow"></div>
+              <div class="scene-deco"></div>
+              <div class="ai-status" id="aiStatus"><span class="ai-check">✓</span>AI 已理解剧情 · 匹配就绪</div>
+              <div class="ad-scene-content" id="adSceneContent">
+                <div class="scene-icon" id="sceneIcon">☕</div>
+                <div class="scene-brand" id="sceneBrand">[XX咖啡]</div>
+                <div class="scene-line" id="sceneLine">每一杯 · 都为奋斗者</div>
+                <div class="scene-quote" id="sceneQuote"></div>
+              </div>
+            </div>
+
+            <!-- Choices -->
+            <div class="choices-overlay" id="choicesOverlay">
+              <div class="ch-header">
+                <span class="ch-ai">AI</span>
+                <span class="ch-label">主角需要提神醒脑，你会建议 TA…</span>
+                <span class="ch-hint">参与 <strong>+10</strong></span>
+              </div>
+              <div class="ch-grid" id="choicesGrid"></div>
+            </div>
+
+            <!-- Result -->
+            <div class="result-overlay" id="resultOverlay">
+              <div class="r-top">
+                <span class="r-badge">🎯 AI 续写结局</span>
+              </div>
+              <div class="r-ai" id="resultAiText"></div>
+              <div class="r-rewards">
+                <span class="rr-item">⭐ 金币 <span class="rr-val" id="resultPoints">+10</span></span>
+                <span class="rr-item">🔥 互动助力 <span class="rr-val" id="resultHeat">+15</span></span>
+              </div>
+            </div>
+
+            <!-- Fullscreen Entry -->
+            <button class="ad-fullscreen-btn" onclick="openFullAd()">⛶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Show Info -->
+      <div class="show-info">
+        <div class="si-title"><span>第18集 · 深夜的办公室</span></div>
+        <div class="si-tags">
+          <span class="si-vip">VIP</span>
+          <span>腾讯独播</span>
+          <span class="si-dot"></span>
+          <span>2025</span>
+          <span class="si-dot"></span>
+          <span>都市 · 职场</span>
+        </div>
+        <div class="si-actions">
+          <button>👍 2.3k</button>
+          <button>💬 892</button>
+          <button>↗ 分享</button>
+        </div>
+        <div class="si-desc" id="showDesc">林悦接手了一个棘手的项目， deadline 就在明天。深夜的办公室只剩下她一个人，困意袭来，但方案还差最后一步……同事李明推门进来，递来一杯热咖啡。</div>
+        <span class="si-desc-toggle" id="descToggle" onclick="toggleDesc()">展开 ∨</span>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <button class="qa-item"><span class="qa-icon">⭐</span>推荐</button>
+        <button class="qa-item"><span class="qa-icon">❤️</span>加追</button>
+        <button class="qa-item"><span class="qa-icon">⬇</span>下载</button>
+        <button class="qa-item"><span class="qa-icon">📺</span>投屏</button>
+        <button class="qa-item"><span class="qa-icon">👥</span>一起看</button>
+      </div>
+
+      <!-- Episode Selector -->
+      <div class="ep-section">
+        <div class="ep-head">
+          <span class="ep-title">选集 · 全40集</span>
+          <span class="ep-arrow">›</span>
+        </div>
+        <div class="ep-scroll" id="epScroll"></div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="rec-section">
+        <div class="rec-title">猜你喜欢</div>
+        <div class="rec-grid">
+          <div class="rec-card"><div class="rec-poster" style="background:linear-gradient(135deg,#1a2a3d,#1d2840);"><span>🏢</span><span class="rec-poster-label">8.9分</span></div><div class="rec-info"><div class="rec-name">理想之城</div><div class="rec-rating">⭐ <span class="rec-score">8.9</span> 职场</div></div></div>
+          <div class="rec-card"><div class="rec-poster" style="background:linear-gradient(135deg,#2a1a1a,#3d2525);"><span>💼</span><span class="rec-poster-label">9.1分</span></div><div class="rec-info"><div class="rec-name">精英律师</div><div class="rec-rating">⭐ <span class="rec-score">9.1</span> 律政</div></div></div>
+          <div class="rec-card"><div class="rec-poster" style="background:linear-gradient(135deg,#1a2530,#1d2828);"><span>🌆</span><span class="rec-poster-label">8.7分</span></div><div class="rec-info"><div class="rec-name">北京女子图鉴</div><div class="rec-rating">⭐ <span class="rec-score">8.7</span> 都市</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PROFILE PAGE ===== -->
+    <div class="page" id="page-profile">
+      <div class="page-header">
+        <div class="header-left"><button class="header-btn">☰</button></div>
+        <div class="header-title">个人中心</div>
+        <div class="header-right">
+          <button class="header-btn">✉</button>
+          <button class="header-btn">⚙</button>
+        </div>
+      </div>
+      <div class="profile-account">
+        <div class="pa-avatar">😊</div>
+        <div class="pa-info">
+          <div class="pa-name">小明同学</div>
+          <div class="pa-level">Lv.18 · 资深剧迷</div>
+          <div class="pa-stats">
+            <div class="pa-stat"><span class="pa-stat-val" id="profCoins">428</span><span class="pa-stat-lbl">金币</span></div>
+            <div class="pa-stat"><span class="pa-stat-val" id="profInteract">86</span><span class="pa-stat-lbl">互动</span></div>
+            <div class="pa-stat"><span class="pa-stat-val" id="profHeat">1,280</span><span class="pa-stat-lbl">热度贡献</span></div>
+          </div>
+        </div>
+        <div class="pa-arrow">›</div>
+      </div>
+      <div class="vip-banner">
+        <span class="vip-icon">👑</span>
+        <span class="vip-text">领取腾讯会员</span>
+        <span class="vip-arrow">›</span>
+      </div>
+      <div class="profile-list-card">
+        <div class="profile-list-item" onclick="go('coins')"><span class="pli-icon">🪙</span><span class="pli-text">我的金币</span><span class="pli-arrow">›</span></div>
+        <div class="profile-list-item" onclick="go('lovedrama')"><span class="pli-icon">❤️</span><span class="pli-text">我的爱剧 · AI 互动</span><span class="pli-arrow">›</span></div>
+        <div class="profile-list-item"><span class="pli-icon">🏅</span><span class="pli-text">我的等级</span><span class="pli-arrow">›</span></div>
+        <div class="profile-list-item"><span class="pli-icon">📋</span><span class="pli-text">观看历史</span><span class="pli-arrow">›</span></div>
+        <div class="profile-list-item" onclick="go('shop')"><span class="pli-icon">🎁</span><span class="pli-text">金币商城</span><span class="pli-arrow">›</span></div>
+        <div class="profile-list-item" onclick="go('ranking')"><span class="pli-icon">🔥</span><span class="pli-text">热度榜单</span><span class="pli-arrow">›</span></div>
+      </div>
+      <div class="profile-list-card">
+        <div class="profile-list-item"><span class="pli-icon">💬</span><span class="pli-text">帮助反馈</span><span class="pli-arrow">›</span></div>
+      </div>
+      <div class="profile-footer">AI 互动剧情广告 · v1.0</div>
+    </div>
+
+    <!-- ===== COINS PAGE ===== -->
+    <div class="page" id="page-coins">
+      <div class="page-header">
+        <div class="header-left"><button class="header-btn back" onclick="go('profile')">‹</button></div>
+        <div class="header-title">我的金币</div>
+      </div>
+      <div class="page-scroll">
+        <div class="coins-user-card">
+          <div class="cuc-top">
+            <div class="cuc-avatar">😊</div>
+            <div class="cuc-info">
+              <div class="cuc-name">小明同学</div>
+              <div class="cuc-level">Lv.18 · 资深剧迷</div>
+            </div>
+          </div>
+          <div class="cuc-stats">
+            <div class="cuc-stat"><div class="cuc-val" id="profilePoints">428</div><div class="cuc-lbl">总金币</div></div>
+            <div class="cuc-stat"><div class="cuc-val" id="interactCnt">86</div><div class="cuc-lbl">互动次数</div></div>
+          </div>
+        </div>
+        <div class="coin-section-title"><span>📋 金币明细</span><span class="cst-more">查看全部 →</span></div>
+        <div class="section-card" style="margin:0 12px 12px;background:var(--bg-card);border:0.5px solid var(--separator);border-radius:var(--radius-lg);overflow:hidden">
+          <div id="pointsHistory"></div>
+        </div>
+        <div class="coin-section-title" style="margin-top:4px"><span>🎁 金币兑换</span><span class="cst-more">更多 →</span></div>
+        <div class="shop-grid coins-grid" style="padding:0 12px 20px" id="coinsGrid"></div>
+      </div>
+    </div>
+
+    <!-- ===== LOVEDRAMA PAGE ===== -->
+    <div class="page" id="page-lovedrama">
+      <div class="page-header">
+        <div class="header-left"><button class="header-btn back" onclick="go('profile')">‹</button></div>
+        <div class="header-title">我的爱剧 · AI 互动</div>
+      </div>
+      <div class="page-scroll">
+        <div class="ld-hero">
+          <div class="ld-hero-top">
+            <div class="ld-poster">🏢</div>
+            <div class="ld-drama-info">
+              <div class="ld-drama-name">都市职场 第三季</div>
+              <div class="ld-drama-sub">共40集 · 都市 · 职场 · 热播中</div>
+            </div>
+          </div>
+          <div class="ld-stats-grid">
+            <div class="ld-stat"><div class="ld-stat-val" id="ldTotalHeat">986,300</div><div class="ld-stat-lbl">总热度</div></div>
+            <div class="ld-stat"><div class="ld-stat-val" id="ldMyHeat">1,280</div><div class="ld-stat-lbl">我的贡献</div></div>
+            <div class="ld-stat"><div class="ld-stat-val" id="ldAdCnt">3</div><div class="ld-stat-lbl">今日已参与</div></div>
+            <div class="ld-stat"><div class="ld-stat-val" id="ldAdRemain">2</div><div class="ld-stat-lbl">今日还可赚</div></div>
+          </div>
+        </div>
+        <div class="ld-vote-module">
+          <div class="ld-vm-head">
+            <span class="ld-vm-icon">📢</span>
+            <span class="ld-vm-title">看 AI 互动广告 · 为剧集冲热度</span>
+            <span class="ld-vm-remain">剩余 <strong id="ldRemainNum">2</strong> 次</span>
+          </div>
+          <div style="text-align:center;padding:6px 0;font-size:10px;color:var(--text-tertiary);margin-bottom:6px">
+            <span style="color:var(--purple);font-weight:600">✦ AI 互动剧情广告 ✦</span>
+          </div>
+          <button class="ld-vm-btn" id="ldVoteBtn" onclick="startAdFromLovedrama()">
+            <span>🎬 看 1 条 AI 互动广告</span>
+            <span class="ld-vm-btn-sub">+15 互动助力值</span>
+          </button>
+          <div class="ld-vm-info">
+            每日最多看 <span class="ld-vm-info-em">5</span> 条 AI 互动广告，参与互动获得金币与助力值。<br>
+            互动助力值占热度榜 <span class="ld-vm-info-em">10%</span> 权重
+          </div>
+        </div>
+        <div class="ld-rank-section">
+          <div class="ld-rank-title">🔥 剧集热度榜</div>
+          <div class="rank-list lovedrama" id="ldRankList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SHOP PAGE ===== -->
+    <div class="page" id="page-shop">
+      <div class="page-header">
+        <div class="header-left"><button class="header-btn back" onclick="go('profile')">‹</button></div>
+        <div class="header-title">金币商城</div>
+      </div>
+      <div class="page-scroll">
+        <div class="balance-card"><div class="b-inner"><span class="b-label">可用金币</span><span class="b-val" id="shopPoints">428</span></div></div>
+        <div class="shop-label">🎁 全部权益</div>
+        <div class="shop-grid" id="shopGrid"></div>
+      </div>
+    </div>
+
+    <!-- ===== RANKING PAGE ===== -->
+    <div class="page" id="page-ranking">
+      <div class="page-header">
+        <div class="header-left"><button class="header-btn back" onclick="go('profile')">‹</button></div>
+        <div class="header-title">热度榜单</div>
+      </div>
+      <div class="page-scroll">
+        <div class="my-rank">
+          <div class="mr-info">
+            <div class="mr-label">我的排名</div>
+            <div class="mr-pos" id="myRankPos">#5</div>
+            <div class="mr-contrib">贡献热度 <span id="myRankContrib">1,280</span></div>
+          </div>
+          <div class="mr-badge">🏆</div>
+        </div>
+        <div class="rank-list" id="rankList"></div>
+      </div>
+    </div>
+
+    <!-- ===== FULLSCREEN AD PAGE ===== -->
+    <div class="page" id="page-fullad">
+      <div class="fullad-backdrop">
+        <div class="fullad-stage" id="fulladStage">
+          <div class="ad-scene coffee" id="fulladScene">
+            <div class="scene-glow"></div>
+            <div class="scene-deco"></div>
+            <div class="ai-status" id="fulladAiStatus"><span class="ai-check">✓</span>AI 已理解剧情 · 匹配就绪</div>
+            <div class="fullad-top">
+              <span class="fullad-badge">AI 广告</span>
+              <span class="fullad-countdown" id="fulladCountdown">10s</span>
+              <button class="fullad-close" onclick="closeFullAd()">✕</button>
+            </div>
+            <div class="fullad-content">
+              <div class="fullad-icon" id="fulladIcon">☕</div>
+              <div class="fullad-brand" id="fulladBrand">[XX咖啡]</div>
+              <div class="fullad-line" id="fulladLine">每一杯 · 都为奋斗者</div>
+              <div class="fullad-quote" id="fulladQuote"></div>
+            </div>
+            <div class="ad-progress" style="position:absolute;bottom:0;left:0;right:0;z-index:12"><div class="ad-progress-fill" id="fulladProgressFill"></div></div>
+            <div class="choices-overlay" id="fulladChoices">
+              <div class="ch-header">
+                <span class="ch-ai">AI</span>
+                <span class="ch-label">你会建议 TA…</span>
+                <span class="ch-hint">参与 <strong>+10</strong></span>
+              </div>
+              <div class="ch-grid" id="fulladChoicesGrid"></div>
+            </div>
+            <div class="result-overlay" id="fulladResult">
+              <div class="r-top"><span class="r-badge">🎯 AI 续写结局</span></div>
+              <div class="r-ai" id="fulladResultText"></div>
+              <div class="r-rewards">
+                <span class="rr-item">⭐ 金币 <span class="rr-val" id="fulladResultPoints">+10</span></span>
+                <span class="rr-item">🔥 互动助力 <span class="rr-val" id="fulladResultHeat">+15</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== AI MATCH PAGE ===== -->
+    <div class="page" id="page-aimatch">
+      <div class="page-header">
+        <div class="header-left"><button class="header-btn back" onclick="go('video')">‹</button></div>
+        <div class="header-title">AI 广告匹配过程</div>
+      </div>
+      <div class="page-scroll">
+        <div class="aim-container">
+
+          <!-- Step 1 -->
+          <div class="aim-step" id="aimStep1">
+            <div class="aim-step-header">
+              <span class="aim-step-num">01</span>
+              <span class="aim-step-title">剧情场景理解</span>
+              <span class="aim-step-status">✓ 已完成</span>
+            </div>
+            <div class="aim-step-body">
+              <div class="aim-metric">
+                <span class="aim-metric-label">🎬 场景类型</span>
+                <span class="aim-metric-value" id="aimSceneType">加载中…</span>
+              </div>
+              <div class="aim-metric">
+                <span class="aim-metric-label">😊 场景情绪</span>
+                <span class="aim-metric-value" id="aimSceneMood">加载中…</span>
+              </div>
+              <div class="aim-metric">
+                <span class="aim-metric-label">👤 主要角色</span>
+                <span class="aim-metric-value" id="aimSceneChar">加载中…</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="aim-arrow">▼</div>
+
+          <!-- Step 2 -->
+          <div class="aim-step" id="aimStep2">
+            <div class="aim-step-header">
+              <span class="aim-step-num">02</span>
+              <span class="aim-step-title">品牌智能匹配</span>
+              <span class="aim-step-status">✓ 已完成</span>
+            </div>
+            <div class="aim-step-body" id="aimMatchBody"></div>
+          </div>
+
+          <div class="aim-arrow">▼</div>
+
+          <!-- Step 3 -->
+          <div class="aim-step" id="aimStep3">
+            <div class="aim-step-header">
+              <span class="aim-step-num">03</span>
+              <span class="aim-step-title">广告内容生成</span>
+              <span class="aim-step-status">✓ 已完成</span>
+            </div>
+            <div class="aim-step-body" id="aimGenBody"></div>
+          </div>
+
+          <!-- Ready -->
+          <div class="aim-ready">
+            <div class="aim-ready-icon">✅</div>
+            <div class="aim-ready-text">AI 已为当前场景完成广告匹配，等待触发播放</div>
+            <button class="aim-ready-btn" onclick="startAdFromAiMatch()">进入互动广告 →</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="go('video')"><span class="nav-icon">🏠</span><span class="nav-label">首页</span></button>
+    <button class="nav-item" style="opacity:0.4"><span class="nav-icon">🎬</span><span class="nav-label">短剧</span></button>
+    <button class="nav-item" style="opacity:0.4"><span class="nav-icon">👑</span><span class="nav-label">会员</span></button>
+    <button class="nav-item" style="opacity:0.4"><span class="nav-icon">🔥</span><span class="nav-label">好片</span></button>
+    <button class="nav-item" onclick="go('profile')"><span class="nav-icon">👤</span><span class="nav-label">我的</span></button>
+  </nav>
+
+  <div class="confetti-box" id="confettiBox"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ============================================
+// AI 互动剧情广告 — 交互脚本
+// ============================================
+const AD_DURATION = 30;
+const AD_CHOICE_TIME = 20; // Choices appear at T=20
+const AD_AUTO_TIME = 10;   // Auto-select at T=10
+const FULLAD_DURATION = 15;
+
+// 3 Brand scenarios — coffee / tech / cultural
+const SCENARIOS = [{
+  brand:{name:'[XX咖啡]',icon:'☕',line:'每一杯 · 都为奋斗者',scene:'coffee'},
+  quote:'同事递来一杯<span class="brand-highlight">[XX咖啡]</span>："还记得大学通宵备考时，这熟悉的味道吗？"',
+  cs:[
+    {text:'温情怀旧',sub:'一杯咖啡，一段奋斗记忆',emoji:'🌙',br:false,
+      reply:'林悦接过<span class="hl">[XX咖啡]</span>，温热的杯身让思绪飘回大学图书馆。咖啡的醇香与深夜的办公室交织——有些味道，跨越时空依然暖心。'},
+    {text:'酷炫提神',sub:'职场效率神器，一秒唤醒',emoji:'⚡',br:true,
+      reply:'<span class="hl">[XX咖啡]</span>强劲萃取，醇香瞬间充满整个办公室。林悦精神一振，键盘声重新响起——现代职场人的效率神器，一秒唤醒战斗力！'}
+  ]
+},{
+  brand:{name:'[XX手机]',icon:'📱',line:'每一刻 · 皆为不凡',scene:'tech'},
+  quote:'林悦需要一款拍照出色的手机——<span class="brand-highlight-tech">[XX手机]</span>，让每一帧都是大片。',
+  cs:[
+    {text:'影像旗舰',sub:'夜景人像，惊艳每一面',emoji:'📸',br:false,
+      reply:'林悦拿起<span class="hl-tech">[XX手机]</span>，夜色中的城市灯火在镜头下清晰呈现。超感光影像系统让每个细节都鲜活——按下快门，就是一张大片。'},
+    {text:'性能先锋',sub:'流畅体验，效率翻倍',emoji:'🚀',br:true,
+      reply:'多任务并行？<span class="hl-tech">[XX手机]</span>游刃有余。林悦的灵感在指尖流淌，App切换如丝般顺滑——这就是旗舰芯片带来的畅快体验。'}
+  ]
+},{
+  brand:{name:'[XX文旅]',icon:'🏯',line:'走遍山河 · 遇见诗意',scene:'guofeng'},
+  quote:'周末到了，林悦翻看旅游攻略——<span class="brand-highlight-cultural">[XX文旅]</span>推荐了一条小众路线。',
+  cs:[
+    {text:'诗意栖居',sub:'住进风景里，慢享生活',emoji:'🌸',br:false,
+      reply:'<span class="hl-cultural">[XX文旅]</span>带林悦来到一座藏在山水间的古村。青石板路、白墙黛瓦——在城市喧嚣之外，找到了一方诗意栖居。'},
+    {text:'探秘寻迹',sub:'不走寻常路，发现秘境',emoji:'🗺️',br:true,
+      reply:'跟着<span class="hl-cultural">[XX文旅]</span>的秘境攻略，林悦发现了一条少有人知的古道。山林深处的瀑布声响如鼓——这才是周末该有的冒险！'}
+  ]
+}];
+
+const SHOP = [
+  {id:1,name:'观影皮肤',icon:'🎨',desc:'播放器皮肤7天',cost:80,badge:'free',iconColor:'accent'},
+  {id:2,name:'彩色弹幕',icon:'💬',desc:'发彩色弹幕7天',cost:120,badge:'free',iconColor:'blue'},
+  {id:3,name:'专属徽章',icon:'⭐',desc:'昵称专属标识',cost:150,badge:'free',iconColor:'orange'},
+  {id:4,name:'免广告体验',icon:'🎫',desc:'24h免广告特权',cost:200,badge:'free',iconColor:'purple'},
+  {id:5,name:'VIP体验卡',icon:'👑',desc:'3天VIP随机抽',cost:500,badge:'lottery',iconColor:'orange'},
+  {id:6,name:'咖啡券',icon:'☕',desc:'星巴克/瑞幸立减',cost:100,badge:'free',iconColor:'accent'},
+];
+
+const RANKS = [
+  {name:'都市职场 第三季',heat:986300,me:1280},
+  {name:'理想之城',heat:845200,me:960},
+  {name:'精英律师',heat:718900,me:840},
+  {name:'北京女子图鉴',heat:695600,me:720},
+  {name:'我在他乡挺好的',heat:572300,me:650},
+  {name:'二十不惑',heat:458900,me:580},
+  {name:'平凡的荣耀',heat:342100,me:510},
+  {name:'加油！妈妈',heat:328700,me:430},
+  {name:'玫瑰之战',heat:215400,me:390},
+  {name:'欢乐颂',heat:102100,me:350},
+];
+
+let HISTORY = [
+  {text:'参与互动广告·[XX咖啡]',pts:10,time:'今天 20:30'},
+  {text:'参与互动广告·[XX咖啡]',pts:10,time:'今天 20:15'},
+  {text:'签到第7天·奖励翻倍',pts:20,time:'今天 10:00'},
+  {text:'参与互动广告·选择互动',pts:10,time:'昨天 21:45'},
+  {text:'每日签到',pts:5,time:'昨天 09:30'},
+];
+
+const S = {
+  page:'video',adOn:false,adT:AD_DURATION,timer:null,scenarioIdx:0,chosen:null,
+  pts:428,heat:1280,cnt:86,adVoteCnt:3,fromLovedrama:false,autoSelected:false,
+  fulladActive:false,fulladT:FULLAD_DURATION,fulladTimer:null,fulladChosen:null,
+  fulladAutoSelected:false,
+};
+
+// DOM shortcuts
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const D = {
+  ad:$('#adOverlay'),adC:$('#adCountdown'),adP:$('#adProgressFill'),
+  scene:$('#adScene'),sceneDeco:$('#adScene .scene-deco'),sceneIcon:$('#sceneIcon'),
+  sceneBrand:$('#sceneBrand'),sceneLine:$('#sceneLine'),sceneQuote:$('#sceneQuote'),
+  ch:$('#choicesOverlay'),cg:$('#choicesGrid'),
+  ro:$('#resultOverlay'),ra:$('#resultAiText'),rp:$('#resultPoints'),rh:$('#resultHeat'),
+  to:$('#toast'),cf:$('#confettiBox'),
+  pp:$('#profilePoints'),ph:$('#pointsHistory'),
+  sg:$('#shopGrid'),cg2:$('#coinsGrid'),
+  rl:$('#rankList'),ldRl:$('#ldRankList'),
+  pb:$('#playBtn'),tm:$('#timeDisplay'),mp:$('#mainProgress'),
+  entryBtn:$('#adEntryBtn'),
+  aiStatus:$('#aiStatus'),fAiStatus:$('#fulladAiStatus'),
+};
+
+function fmt(n){return n>=1e4?(n/1e4).toFixed(1)+'万':n>=1e3?(n/1e3).toFixed(1)+'k':''+n}
+
+// Description toggle
+function toggleDesc(){
+  const el = document.getElementById('showDesc');
+  const btn = document.getElementById('descToggle');
+  const exp = el.classList.toggle('expanded');
+  btn.textContent = exp ? '收起 ∧' : '展开 ∨';
+}
+
+// Episodes
+function renderEpisodes(){
+  $('#epScroll').innerHTML = Array.from({length:40},(_,i)=>{
+    const active = i+1===18?' active':'';
+    const vip = i+1>20?'<span class="ep-vip">VIP</span>':'';
+    return `<div class="ep-card${active}">${i+1}${vip}</div>`;
+  }).join('');
+}
+
+// Decorative elements per scene
+function buildDeco(sceneType){
+  const map = {
+    coffee: `
+      <div class="deco-circle"></div><div class="deco-circle"></div>
+      <div class="deco-line"></div><div class="deco-line"></div>
+      <div class="deco-steam"></div><div class="deco-steam"></div><div class="deco-steam"></div>`,
+    tech: `
+      <div class="deco-circle"></div><div class="deco-circle"></div>
+      <div class="deco-line"></div><div class="deco-line"></div>
+      <div class="deco-dot"></div><div class="deco-dot"></div><div class="deco-dot"></div><div class="deco-dot"></div>
+      <div class="deco-particle"></div><div class="deco-particle"></div><div class="deco-particle"></div>`,
+    guofeng: `
+      <div class="deco-circle"></div><div class="deco-circle"></div>
+      <div class="deco-line"></div><div class="deco-line"></div>
+      <div class="deco-mountain"></div>
+      <div class="deco-dot"></div><div class="deco-dot"></div><div class="deco-dot"></div><div class="deco-dot"></div>`
+  };
+  return map[sceneType] || map.coffee;
+}
+
+// Confetti
+function confetti(){
+  D.cf.innerHTML='';
+  const colors=['#F5C518','#FFD60A','#FF7A00','#3B8BFF','#AF52DE','#34C759'];
+  for(let i=30;i--;){
+    const e=document.createElement('div');
+    e.className='confetti';
+    const sz=3+Math.random()*5;
+    e.style.cssText=`left:${Math.random()*100}%;width:${sz}px;height:${sz}px;background:${colors[Math.floor(Math.random()*colors.length)]};animation-delay:${Math.random()*.6}s;animation-duration:${1.5+Math.random()*2}s`;
+    D.cf.appendChild(e);
+  }
+  setTimeout(()=>D.cf.innerHTML='',4000);
+}
+
+// Toast
+function toast(msg,ic='✓'){
+  D.to.innerHTML='<span>'+ic+'</span> '+msg;
+  D.to.classList.add('show');
+  clearTimeout(D.to._t);
+  D.to._t=setTimeout(()=>D.to.classList.remove('show'),2400);
+}
+
+// AI status
+function showAiStatus(txt){
+  if(D.aiStatus){D.aiStatus.innerHTML='<span class="ai-dot"></span>'+txt;D.aiStatus.style.opacity='1';D.aiStatus.classList.remove('done')}
+}
+function doneAiStatus(){
+  if(D.aiStatus){D.aiStatus.innerHTML='<span class="ai-check">✓</span> AI 匹配完成 · 选择剧情走向';D.aiStatus.classList.add('done')}
+}
+function hideAiStatus(){
+  if(D.aiStatus)D.aiStatus.style.opacity='0'
+}
+// Fullscreen AI status
+function fshowAiStatus(txt){
+  if(D.fAiStatus){D.fAiStatus.innerHTML='<span class="ai-dot"></span>'+txt;D.fAiStatus.style.opacity='1';D.fAiStatus.classList.remove('done')}
+}
+function fhideAiStatus(){
+  if(D.fAiStatus)D.fAiStatus.style.opacity='0'
+}
+
+// Navigation
+function go(pg){
+  if(pg===S.page) return;
+  S.page=pg;
+  $$('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+pg));
+  document.querySelector('.bottom-nav').style.display=(pg==='fullad'?'none':'flex');
+  const navMap={video:0,profile:4,coins:4,lovedrama:4,shop:4,ranking:4,fullad:0,aimatch:0};
+  $$('.nav-item').forEach((n,i)=>n.classList.toggle('active',i===navMap[pg]));
+  if(pg==='aimatch') renderAiMatch();
+}
+
+// Show random scenario
+function pickScenario(){
+  S.scenarioIdx = (S.scenarioIdx + 1) % SCENARIOS.length;
+  const s = SCENARIOS[S.scenarioIdx];
+  D.scene.className = 'ad-scene ' + s.brand.scene;
+  D.sceneDeco.innerHTML = buildDeco(s.brand.scene);
+  D.sceneIcon.textContent = s.brand.icon;
+  D.sceneBrand.textContent = s.brand.name;
+  D.sceneLine.textContent = s.brand.line;
+  D.sceneQuote.innerHTML = s.quote;
+  D.cg.innerHTML = s.cs.map((c,i)=>`
+    <button class="ch-btn" onclick="pickChoice(${i})">
+      <span class="ch-icon">${c.emoji}</span>
+      <span class="ch-text">${c.text}</span>
+      <span class="ch-sub">${c.sub}</span>
+      ${c.br?'<span class="ch-brand">推荐</span>':''}
+    </button>
+  `).join('');
+}
+
+// Start ad
+function startAd(){
+  if(S.adOn) return;
+  S.adOn=true;S.adT=AD_DURATION;S.chosen=null;S.autoSelected=false;
+  pickScenario();
+  D.ad.classList.add('show');
+  D.ch.classList.remove('show');
+  D.ro.classList.remove('show');
+  document.getElementById('videoPlayer').classList.add('ad-active');
+  D.adC.textContent=S.adT+'s';
+  D.adP.style.width='0%';
+  D.entryBtn.style.opacity='0';D.entryBtn.style.pointerEvents='none';
+  showAiStatus('AI 已理解剧情 · 匹配 ' + SCENARIOS[S.scenarioIdx].brand.icon + ' ' + SCENARIOS[S.scenarioIdx].brand.name);
+  S.timer=setInterval(tick,1000);
+}
+
+function tick(){
+  S.adT--;
+  const elapsed = AD_DURATION - S.adT;
+  D.adC.textContent = S.adT + 's';
+  D.adC.className = 'ad-countdown' + (S.adT <= 4 ? ' danger' : '');
+  D.adP.style.width = (elapsed / AD_DURATION * 100) + '%';
+
+  // Phase 1→2: Show choices at T=20 (10s intro)
+  if (elapsed === (AD_DURATION - AD_CHOICE_TIME) && S.chosen === null) {
+    D.ch.classList.add('show');
+    doneAiStatus();
+  }
+
+  // Phase 2→3: Auto-select option A at T=10 (20s elapsed)
+  if (S.adT <= AD_AUTO_TIME && S.chosen === null && !S.autoSelected) {
+    S.autoSelected = true;
+    pickChoice(0);
+  }
+
+  // End ad
+  if (S.adT <= 0) {
+    clearInterval(S.timer);
+    endAd();
+  }
+}
+
+function endAd(){
+  if(!S.adOn) return;
+  S.adOn=false;clearInterval(S.timer);
+  D.ad.classList.remove('show');D.ch.classList.remove('show');D.ro.classList.remove('show');
+  document.getElementById('videoPlayer').classList.remove('ad-active');
+  D.entryBtn.style.opacity='1';D.entryBtn.style.pointerEvents='auto';
+  if(S.fromLovedrama){
+    S.fromLovedrama=false;
+    S.adVoteCnt=(S.adVoteCnt||0)+1;
+    S.heat+=15;
+    updateLovedramaBtn();
+    go('lovedrama');
+    toast('助力成功 +15 热度','🔥');
+    return;
+  }
+  D.mp.style.width='46%';D.tm.textContent='25:22 / 42:00';
+  if(S.page!=='profile') toast('AI 互动广告结束，精彩继续','🎬');
+  clearTimeout(S._next);
+  S._next=setTimeout(()=>{D.mp.style.width='50%';D.tm.textContent='27:04 / 42:00';startAd();},12000);
+}
+
+// Choice
+function pickChoice(i){
+  if(S.chosen!==null||!S.adOn) return;
+  if(!D.ch.classList.contains('show')&&!S.autoSelected) return; // Not yet choice phase
+  S.chosen=i;
+  const btns=D.cg.querySelectorAll('.ch-btn');
+  btns.forEach((b,idx)=>{if(idx===i)b.classList.add('chosen');else b.style.opacity='.3'});
+  const pts=10,ht=15;
+  S.pts+=pts;S.heat+=ht;S.cnt++;
+  syncPoints();
+  D.ch.classList.remove('show');
+  D.ra.innerHTML=SCENARIOS[S.scenarioIdx].cs[i].reply;
+  D.rp.textContent='+'+pts;D.rh.textContent='+'+ht;
+  D.ro.classList.add('show');
+  HISTORY.unshift({text:'参与互动广告·'+SCENARIOS[S.scenarioIdx].brand.name,pts,time:'刚刚'});
+  confetti();
+}
+
+function syncPoints(){
+  D.pp.textContent=S.pts;
+  const sp=document.getElementById('shopPoints');if(sp)sp.textContent=S.pts;
+  const pc=document.getElementById('profCoins');if(pc)pc.textContent=S.pts;
+  const pi=document.getElementById('profInteract');if(pi)pi.textContent=S.cnt;
+  const ph=document.getElementById('profHeat');if(ph)ph.textContent=fmt(S.heat);
+  const ic=document.getElementById('interactCnt');if(ic)ic.textContent=S.cnt;
+}
+
+// Fullscreen Ad
+function openFullAd(){
+  if(S.fulladActive) return;
+  S.fulladActive=true;
+  S.fulladAutoSelected=false;
+  if(S.adOn){clearInterval(S.timer);S.adOn=false;D.ad.classList.remove('show');D.ch.classList.remove('show');D.ro.classList.remove('show');document.getElementById('videoPlayer').classList.remove('ad-active');D.entryBtn.style.opacity='1';D.entryBtn.style.pointerEvents='auto'}
+  clearTimeout(S._next);
+  const si=(S.scenarioIdx+1)%SCENARIOS.length;
+  const s=SCENARIOS[si];
+  S.fulladChosen=null;
+  const fscene=document.getElementById('fulladScene');
+  fscene.className='ad-scene '+s.brand.scene;
+  fscene.querySelector('.scene-deco').innerHTML=buildDeco(s.brand.scene);
+  document.getElementById('fulladIcon').textContent=s.brand.icon;
+  document.getElementById('fulladBrand').textContent=s.brand.name;
+  document.getElementById('fulladLine').textContent=s.brand.line;
+  document.getElementById('fulladQuote').innerHTML=s.quote;
+  const fcg=document.getElementById('fulladChoicesGrid');
+  fcg.innerHTML=s.cs.map((c,i)=>`
+    <button class="ch-btn" onclick="fulladPickChoice(${i})">
+      <span class="ch-icon">${c.emoji}</span>
+      <span class="ch-text">${c.text}</span>
+      <span class="ch-sub">${c.sub}</span>
+      ${c.br?'<span class="ch-brand">推荐</span>':''}
+    </button>
+  `).join('');
+  S.fulladT=FULLAD_DURATION;
+  document.getElementById('fulladCountdown').textContent=S.fulladT+'s';
+  document.getElementById('fulladCountdown').className='fullad-countdown';
+  document.getElementById('fulladProgressFill').style.width='0%';
+  document.getElementById('fulladChoices').classList.remove('show');
+  document.getElementById('fulladResult').classList.remove('show');
+  fshowAiStatus('AI 已匹配 · ' + s.brand.icon + ' ' + s.brand.name);
+  go('fullad');
+  S.fulladTimer=setInterval(fulladTick,1000);
+}
+function fulladTick(){
+  S.fulladT--;
+  const felapsed = FULLAD_DURATION - S.fulladT;
+  const el=document.getElementById('fulladCountdown');
+  el.textContent=S.fulladT+'s';
+  el.className='fullad-countdown'+(S.fulladT<=3?' danger':'');
+  document.getElementById('fulladProgressFill').style.width=(felapsed / FULLAD_DURATION * 100)+'%';
+
+  // Show choices at T=10 (5s intro)
+  if (felapsed === 5 && S.fulladChosen === null) {
+    document.getElementById('fulladChoices').classList.add('show');
+    fhideAiStatus();
+  }
+
+  // Auto-select at T=5 (10s elapsed)
+  if (S.fulladT <= 5 && S.fulladChosen === null && !S.fulladAutoSelected) {
+    S.fulladAutoSelected = true;
+    fulladPickChoice(0);
+  }
+
+  // End
+  if (S.fulladT <= 0) {
+    clearInterval(S.fulladTimer);
+    endFullAd();
+  }
+}
+function fulladPickChoice(i){
+  if(S.fulladChosen!==null||!S.fulladActive) return;
+  if(!document.getElementById('fulladChoices').classList.contains('show')&&!S.fulladAutoSelected) return;
+  S.fulladChosen=i;
+  const fcg=document.getElementById('fulladChoicesGrid');
+  const btns=fcg.querySelectorAll('.ch-btn');
+  btns.forEach((b,idx)=>{if(idx===i)b.classList.add('chosen');else b.style.opacity='.3'});
+  const pts=10,ht=15;
+  S.pts+=pts;S.heat+=ht;S.cnt++;
+  syncPoints();
+  document.getElementById('fulladChoices').classList.remove('show');
+  const si=(S.scenarioIdx+1)%SCENARIOS.length;
+  document.getElementById('fulladResultText').innerHTML=SCENARIOS[si].cs[i].reply;
+  document.getElementById('fulladResultPoints').textContent='+'+pts;
+  document.getElementById('fulladResultHeat').textContent='+'+ht;
+  document.getElementById('fulladResult').classList.add('show');
+  HISTORY.unshift({text:'参与互动广告·全屏互动',pts,time:'刚刚'});
+  confetti();
+}
+function fulladCloseResult(){
+  document.getElementById('fulladResult').classList.remove('show');
+  toast('+10 金币已到账','⭐');
+}
+function endFullAd(){
+  if(!S.fulladActive) return;
+  S.fulladActive=false;clearInterval(S.fulladTimer);
+  document.getElementById('fulladChoices').classList.remove('show');
+  document.getElementById('fulladResult').classList.remove('show');
+  syncPoints();
+  go('video');
+  clearTimeout(S._next);
+  S._next=setTimeout(()=>{D.mp.style.width='50%';D.tm.textContent='27:04 / 42:00';startAd();},8000);
+  toast('全屏互动已完成','🎬');
+}
+function closeFullAd(){
+  if(!S.fulladActive) return;
+  S.fulladActive=false;clearInterval(S.fulladTimer);
+  go('video');
+  toast('已关闭','✕');
+}
+
+// Lovedrama flow
+function startAdFromLovedrama(){
+  if(S.adOn) return;
+  const remain=5-(S.adVoteCnt||0);
+  if(remain<=0) return toast('今日已用完5次，明天再来吧','😅');
+  S.fromLovedrama=true;
+  go('video');
+  setTimeout(startAd,400);
+}
+function updateLovedramaBtn(){
+  const remain=5-(S.adVoteCnt||0);
+  ['ldRemainNum','ldAdCnt','ldAdRemain','ldMyHeat'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    if(id==='ldRemainNum') el.textContent=Math.max(0,remain);
+    else if(id==='ldAdCnt') el.textContent=S.adVoteCnt||0;
+    else if(id==='ldAdRemain') el.textContent=Math.max(0,remain);
+    else if(id==='ldMyHeat') el.textContent=S.heat;
+  });
+  const btn=document.getElementById('ldVoteBtn');
+  if(btn){btn.disabled=remain<=0;btn.style.opacity=remain<=0?'0.4':'1'}
+}
+
+// AI Match page
+function renderAiMatch(){
+  const s=SCENARIOS[S.scenarioIdx];
+  document.getElementById('aimSceneType').textContent='都市 · 职场';
+  document.getElementById('aimSceneMood').textContent='疲惫 · 深夜 · 独处';
+  document.getElementById('aimSceneChar').textContent='林悦（主角）· 李明（同事）';
+
+  const matchData=[
+    {icon:'☕',name:'[XX咖啡]',score:92,tag:'已选中',cls:'top'},
+    {icon:'📱',name:'[XX手机]',score:45,tag:'',cls:''},
+    {icon:'🏯',name:'[XX文旅]',score:18,tag:'',cls:''},
+  ];
+  document.getElementById('aimMatchBody').innerHTML=matchData.map(m=>`
+    <div class="aim-match-row${m.cls?' '+m.cls:''}">
+      <span class="aim-match-icon">${m.icon}</span>
+      <span class="aim-match-name">${m.name}</span>
+      <div class="aim-match-bar-wrap"><div class="aim-match-bar${m.tag?' fill':''}" style="width:${m.score}%"></div></div>
+      <span class="aim-match-score">${m.score}%</span>
+      ${m.tag?'<span class="aim-match-tag">'+m.tag+'</span>':''}
+    </div>
+  `).join('');
+
+  document.getElementById('aimGenBody').innerHTML=`
+    <div class="aim-gen-row"><span class="aim-gen-label">🎨 风格</span><span class="aim-gen-value">${s.cs[0].text} · ${s.cs[1].text}（双选项）</span></div>
+    <div class="aim-gen-row"><span class="aim-gen-label">📝 台词</span><span class="aim-gen-value">${s.cs[0].sub}</span></div>
+    <div class="aim-gen-row"><span class="aim-gen-label">🎬 时长</span><span class="aim-gen-value">30 秒（情景铺垫 + 互动选择 + 结局）</span></div>
+  `;
+}
+function startAdFromAiMatch(){
+  go('video');
+  setTimeout(startAd,300);
+}
+
+// Render functions
+function renderHistory(){
+  D.ph.innerHTML=HISTORY.map(h=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:0.5px solid var(--separator);transition:.15s">
+      <div style="width:32px;height:32px;border-radius:var(--radius-full);background:rgba(var(--accent-rgb),0.06);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🎯</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:500;color:var(--text-primary)">${h.text}</div><div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">${h.time}</div></div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent)">+${h.pts}</div>
+    </div>
+  `).join('');
+}
+
+function renderShop(){
+  const iconColors={accent:'accent',blue:'blue',orange:'orange',purple:'purple',gold:'gold'};
+  const badgeMap={free:{t:'免费',c:'free'},lottery:{t:'抽奖',c:'lottery'}};
+  const html=SHOP.map(i=>{
+    const b=badgeMap[i.badge]||{t:'',c:''};
+    return `<div class="shop-item" onclick="buy(${i.id})">
+      ${'<span class="si-badge '+b.c+'">'+b.t+'</span>'}
+      <div class="si-icon-cell ${iconColors[i.iconColor]||'accent'}">${i.icon}</div>
+      <div class="si-name">${i.name}</div>
+      <div class="si-desc">${i.desc}</div>
+      <div class="si-price">⚡ ${i.cost}</div>
+    </div>`;
+  }).join('');
+  D.sg.innerHTML=html;
+  if(D.cg2) D.cg2.innerHTML=html;
+}
+
+function renderRanks(){
+  const medal=['🥇','🥈','🥉'];
+  const html=RANKS.map((r,i)=>{
+    const cls=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const num=i<3?`<span class="r-num">${medal[i]}</span>`:`<div class="r-num ${cls}">${i+1}</div>`;
+    return `<div class="rank-item${r.me===1280?' me':''}">${num}<div class="r-info"><div class="r-name">${r.name}</div><div class="r-heat">热度 ${fmt(r.heat)}</div></div><div class="r-contrib"><div class="rc-val">${fmt(r.me)}</div><span class="rc-lbl">我的贡献</span></div></div>`;
+  }).join('');
+  D.rl.innerHTML=html;
+  if(D.ldRl) D.ldRl.innerHTML=html;
+}
+
+function buy(id){
+  const i=SHOP.find(x=>x.id===id);
+  if(!i) return;
+  if(S.pts<i.cost) return toast('金币不足','😅');
+  S.pts-=i.cost;
+  syncPoints();
+  toast('已兑换「'+i.name+'」','🎉');
+}
+
+// Play toggle
+let playing=true;
+D.pb.addEventListener('click',()=>{playing=!playing;D.pb.textContent=playing?'⏸':'▶'});
+
+// Status bar time
+function updateTime(){
+  const d=new Date();
+  document.getElementById('statusTime').textContent=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+updateTime();
+setInterval(updateTime,30000);
+
+// Init
+renderEpisodes();
+renderHistory();
+renderShop();
+renderRanks();
+updateLovedramaBtn();
+syncPoints();
+setTimeout(startAd,1800);
+</script>
+</body>
+</html>
